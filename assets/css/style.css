@@ -1,0 +1,9 @@
+/* Basic modal styles - you can customize */
+.servetech-dp-modal { position: fixed; inset: 0; z-index: 99999; font-family: Arial, sans-serif; }
+.servetech-dp-overlay { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
+.servetech-dp-dialog { position: relative; max-width: 520px; margin: 8% auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); z-index: 100000; }
+.servetech-dp-close { position: absolute; right: 10px; top: 8px; background: transparent; border: 0; font-size: 22px; }
+.servetech-dp-tiles { display:flex; gap:10px; margin: 12px 0; }
+.servetech-dp-tile { padding: 12px 18px; border-radius:6px; border:1px solid #ddd; background:#f7f7f7; cursor:pointer; }
+.servetech-dp-tile.active { border-color:#007cba; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+.servetech-dp-actions { text-align:right; margin-top:16px; display:flex; gap:8px; justify-content:flex-end; }
