@@ -18,8 +18,17 @@ Notes:
 - You can style the modal via assets/css/style.css
 - This plugin aims to be a starting point. Adjust UX or edge cases as needed.
 
-
-
+servetech-donation-popup/
+├── includes/
+│   ├── Plugin.php
+│   └── admin/
+│       └── Settings.php   ← NEW FILE
+├── assets/
+│   ├── css/style.css
+│   ├── js/frontend.js
+│   └── img/
+│       ├── default-bouquet.jpg
+│       └── foundation-logo.png
 
 
 
