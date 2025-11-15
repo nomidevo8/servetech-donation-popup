@@ -8,7 +8,6 @@
             <div class="servetech-dp-overlay"></div>\
             <div class="servetech-dp-dialog">\
                 <button class="servetech-dp-close" aria-label="close">×</button>\
-                <div class="servetech-dp-content">\
                     <div class="servetech-dp-left">\
                         <img src="' + SERVETECH_DP.popup_image + '" alt="Bouquet" class="servetech-dp-img">\
                     </div>\
@@ -31,7 +30,6 @@
                         </div>\
                         <p class="servetech-dp-footnote">*Note: purchase does not constitute a charitable donation.</p>\
                     </div>\
-                </div>\
             </div>\
         </div>';
 
