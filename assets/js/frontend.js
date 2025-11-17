@@ -187,14 +187,10 @@
          * 8. Helper: build cart data from the original form (single product)
          * ----------------------------------------------------------------- */
         function buildCartData($form) {
-            var product_id = $form.find('input[name="add-to-cart"]').val();
-            if (!product_id) return null; // stop if no product_id
-
             var data = {
-                product_id: product_id,
+                product_id: $form.find('input[name="add-to-cart"]').val(),
                 quantity  : $form.find('input[name="quantity"]').val() || 1
             };
-
             var variation_id = $form.find('input[name="variation_id"]').val();
             if (variation_id && variation_id !== '') {
                 data.variation_id = variation_id;
@@ -204,10 +200,8 @@
                     data.variation[name] = $(this).val();
                 });
             }
-
             return data;
         }
-
 
         /* -----------------------------------------------------------------
          * 9. Intercept any “Add to Cart” click / form submit
@@ -257,19 +251,14 @@
             interceptEvent(e, $el, cartData);
         });
 
-        // ----- Single product form (works for simple products in Elementor/ShopEngine) -----
-        $(document).on('click', 'form.cart button.single_add_to_cart_button, form.cart button[type="submit"]', function(e){
-            var $form = $(this).closest('form.cart');
+        // ----- Single product form -----
+        $(document).on('submit', 'form.cart', function(e) {
+            var $form = $(this);
             if ($form.data('servetech-submitted')) return;
-            e.preventDefault();
-            e.stopImmediatePropagation();
-
             var cartData = buildCartData($form);
-            if (!cartData) return;
-
+            if (!cartData.product_id) return;
             interceptEvent(e, $form, cartData);
         });
-
 
     });
 })(jQuery);
