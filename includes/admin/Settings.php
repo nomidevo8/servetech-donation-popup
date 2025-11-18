@@ -7,7 +7,6 @@ namespace SERVETECH_DP\Admin;
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
-
 class Settings {
 
     private $plugin;
