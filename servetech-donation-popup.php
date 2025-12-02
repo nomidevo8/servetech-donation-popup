@@ -12,8 +12,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Basic plugin constants
-// define( 'SERVETECH_DP_VERSION', '1.0.0' );
-define( 'SERVETECH_DP_VERSION', time());
+define( 'SERVETECH_DP_VERSION', '1.0.0.13' );
+// define( 'SERVETECH_DP_VERSION', time());
 define( 'SERVETECH_DP_FILE', __FILE__ );
 define( 'SERVETECH_DP_PATH', plugin_dir_path( SERVETECH_DP_FILE ) );
 define( 'SERVETECH_DP_URL', plugin_dir_url( SERVETECH_DP_FILE ) );

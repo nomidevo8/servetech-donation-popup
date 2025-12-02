@@ -106,6 +106,69 @@ class Plugin {
         return $id;
     }
 
+    /**
+     * Create a one-off donation product with a custom amount.
+     * Returns the new product ID on success or 0 on failure.
+     */
+    private function create_custom_donation_product( $amount ) {
+        $amount = floatval( $amount );
+        if ( $amount <= 0 ) {
+            return 0;
+        }
+
+        // Reuse a single universal custom-donation product instead of creating
+        // a new post for every custom amount. We update the product price
+        // before adding to cart.
+        $sku = 'servetech-don-custom';
+
+        $existing_id = wc_get_product_id_by_sku( $sku );
+        if ( $existing_id ) {
+            $product = wc_get_product( $existing_id );
+            if ( $product ) {
+                $product->set_name( "Donation - \${$amount} (Custom)" );
+                $product->set_price( $amount );
+                $product->set_regular_price( $amount );
+                $product->save();
+
+                if ( function_exists( 'wc_update_product_lookup_tables' ) ) {
+                    wc_update_product_lookup_tables( $existing_id );
+                }
+
+                update_post_meta( $existing_id, '_servetech_is_donation', 'yes' );
+                update_post_meta( $existing_id, '_servetech_is_custom_donation', 'yes' );
+                clean_post_cache( $existing_id );
+                wp_cache_delete( 'product-' . $existing_id, 'products' );
+
+                return $existing_id;
+            }
+        }
+
+        // Create the universal custom product the first time it's needed.
+        $product = new \WC_Product_Simple();
+        $product->set_name( "Donation - \${$amount} (Custom)" );
+        $product->set_status( 'publish' );
+        $product->set_catalog_visibility( 'hidden' );
+        $product->set_price( $amount );
+        $product->set_regular_price( $amount );
+        $product->set_sku( $sku );
+        $product->set_virtual( true );
+        $product->set_manage_stock( false );
+        $product->set_sold_individually( false );
+
+        $id = $product->save();
+
+        if ( $id && function_exists( 'wc_update_product_lookup_tables' ) ) {
+            wc_update_product_lookup_tables( $id );
+        }
+
+        update_post_meta( $id, '_servetech_is_donation', 'yes' );
+        update_post_meta( $id, '_servetech_is_custom_donation', 'yes' );
+        clean_post_cache( $id );
+        wp_cache_delete( 'product-' . $id, 'products' );
+
+        return $id;
+    }
+
     public function enqueue_assets() {
         if ( ! function_exists( 'is_woocommerce' ) ) return;
 
@@ -226,7 +289,19 @@ class Plugin {
         }
 
         // 2. Add donation (optional)
-        if ( $donation_sku ) {
+        // Support custom amount: if `donation_custom_amount` is provided and > 0,
+        // create a one-off donation product and add it to the cart instead of
+        // the predefined SKU.
+        $custom_amount = isset( $_POST['donation_custom_amount'] )
+            ? floatval( sanitize_text_field( wp_unslash( $_POST['donation_custom_amount'] ) ) )
+            : 0;
+
+        if ( $custom_amount > 0 ) {
+            $donation_id = $this->create_custom_donation_product( $custom_amount );
+            if ( $donation_id ) {
+                WC()->cart->add_to_cart( $donation_id, 1 );
+            }
+        } elseif ( $donation_sku ) {
             $donation_id = wc_get_product_id_by_sku( $donation_sku );
             if ( $donation_id ) {
                 WC()->cart->add_to_cart( $donation_id, 1 );
@@ -286,3 +361,4 @@ class Plugin {
         }
     }
 }
+

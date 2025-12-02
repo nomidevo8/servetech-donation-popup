@@ -156,7 +156,6 @@
 .servetech-dp-proceed:hover { background: #8d6a3f; }
 
 .servetech-dp-proceed:disabled {
-    background: #ccc;
     cursor: not-allowed;
 }
 
@@ -169,6 +168,7 @@
     font-size: 14px;
     cursor: pointer;
     letter-spacing: 0.5px;
+    background: #ccc !important;
 }
 .servetech-dp-skip:hover { background: #444; }
 
@@ -347,4 +347,11 @@
     #servetech-dp-recipient-modal .servetech-dp-actions button {
         width: 100%;
     }
+}
+
+
+/* Custom input styling  */
+input.servetech-dp-custom-input {
+        max-width: 250px;
+    margin-bottom: 20px;
 }

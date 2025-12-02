@@ -20,6 +20,10 @@
                         <button class="servetech-dp-tile" data-sku="servetech-don-10">$10</button>\
                         <button class="servetech-dp-tile" data-sku="servetech-don-15">$15</button>\
                     </div>\
+                    <div class="servetech-dp-custom">\
+                        <label class="servetech-dp-custom-label">Or enter a custom amount</label>\
+                        <input type="number" step="0.01" min="0" name="donation_custom_amount" class="servetech-dp-custom-input" placeholder="e.g. 7.50">\
+                    </div>\
                     <div class="servetech-dp-actions">\
                         <button class="servetech-dp-skip">SKIP</button>\
                         <button class="servetech-dp-proceed" disabled>ADD TO CART</button>\
@@ -55,6 +59,7 @@
         var $donationModal = $('#servetech-dp-modal');
         var $recipientModal = $('#servetech-dp-recipient-modal');
         var chosenSku = '';
+        var chosenCustomAmount = 0;
         var pendingCartData = null;   // will hold main product + donation
 
         /* -----------------------------------------------------------------
@@ -74,7 +79,26 @@
             $donationModal.find('.servetech-dp-tile').removeClass('active');
             $(this).addClass('active');
             chosenSku = $(this).data('sku');
+            // clear custom amount when tile selected
+            chosenCustomAmount = 0;
+            $donationModal.find('.servetech-dp-custom-input').val('');
             $donationModal.find('.servetech-dp-proceed').prop('disabled', false);
+        });
+
+        // Custom amount input behaviour
+        $donationModal.on('input', '.servetech-dp-custom-input', function (e) {
+            var v = parseFloat($(this).val());
+            if (isNaN(v) || v <= 0) {
+                chosenCustomAmount = 0;
+            } else {
+                chosenCustomAmount = v;
+                // deselect tiles when custom amount entered
+                $donationModal.find('.servetech-dp-tiles .servetech-dp-tile').removeClass('active');
+                chosenSku = '';
+            }
+            // enable proceed if tile selected OR custom amount provided
+            var enable = chosenSku || chosenCustomAmount > 0;
+            $donationModal.find('.servetech-dp-proceed').prop('disabled', !enable);
         });
 
         /* -----------------------------------------------------------------
@@ -85,9 +109,11 @@
 
             // store the chosen SKU (empty on SKIP)
             if ($(this).hasClass('servetech-dp-proceed')) {
-                // user selected a tile → keep chosenSku
+                // user selected a tile or entered custom amount → keep chosen values
             } else {
                 chosenSku = '';                     // SKIP
+                chosenCustomAmount = 0;
+                $donationModal.find('.servetech-dp-custom-input').val('');
             }
 
             closeModal($donationModal);
@@ -115,7 +141,8 @@
                 quantity: window.__servetech_dp_pending.quantity || 1,
                 variation_id: window.__servetech_dp_pending.variation_id || 0,
                 variation: window.__servetech_dp_pending.variation || {},
-                donation_sku: chosenSku
+                donation_sku: chosenSku,
+                donation_custom_amount: chosenCustomAmount
             };
             openModal($recipientModal);
         }
@@ -161,6 +188,7 @@
                 variation_id: pendingCartData.variation_id,
                 variation: pendingCartData.variation,
                 donation_sku: pendingCartData.donation_sku,
+                donation_custom_amount: pendingCartData.donation_custom_amount,
                 recipient: recipient
             };
 
