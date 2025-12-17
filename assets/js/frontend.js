@@ -3,7 +3,8 @@
     $(document).ready(function () {
 
         /* -----------------------------------------------------------------
-         * 1. Build BOTH modals (image/logo injected from PHP)
+         * 1. Build donation modal (image/logo injected from PHP)
+         * NOTE: Recipient modal functionality has been commented out
          * ----------------------------------------------------------------- */
         var modalHTML = '\
         <div id="servetech-dp-modal" class="servetech-dp-modal" style="display:none;">\
@@ -34,6 +35,7 @@
             </div>\
         </div>';
 
+        /* RECIPIENT MODAL - COMMENTED OUT
         var recipientHTML = '\
         <div id="servetech-dp-recipient-modal" class="servetech-dp-modal" style="display:none;">\
             <div class="servetech-dp-overlay"></div>\
@@ -53,14 +55,16 @@
                 </form>\
             </div>\
         </div>';
+        */
 
-        $('body').append(modalHTML + recipientHTML);
+        $('body').append(modalHTML); // Only append donation modal
+        // $('body').append(modalHTML + recipientHTML); // OLD CODE
 
         var $donationModal = $('#servetech-dp-modal');
-        var $recipientModal = $('#servetech-dp-recipient-modal');
+        // var $recipientModal = $('#servetech-dp-recipient-modal'); // COMMENTED OUT
         var chosenSku = '';
         var chosenCustomAmount = 0;
-        var pendingCartData = null;   // will hold main product + donation
+        var pendingCartData = null;
 
         /* -----------------------------------------------------------------
          * 2. Helpers
@@ -79,62 +83,97 @@
             $donationModal.find('.servetech-dp-tile').removeClass('active');
             $(this).addClass('active');
             chosenSku = $(this).data('sku');
-            // clear custom amount when tile selected
             chosenCustomAmount = 0;
             $donationModal.find('.servetech-dp-custom-input').val('');
             $donationModal.find('.servetech-dp-proceed').prop('disabled', false);
         });
 
-        // Custom amount input behaviour
         $donationModal.on('input', '.servetech-dp-custom-input', function (e) {
             var v = parseFloat($(this).val());
             if (isNaN(v) || v <= 0) {
                 chosenCustomAmount = 0;
             } else {
                 chosenCustomAmount = v;
-                // deselect tiles when custom amount entered
                 $donationModal.find('.servetech-dp-tiles .servetech-dp-tile').removeClass('active');
                 chosenSku = '';
             }
-            // enable proceed if tile selected OR custom amount provided
             var enable = chosenSku || chosenCustomAmount > 0;
             $donationModal.find('.servetech-dp-proceed').prop('disabled', !enable);
         });
 
         /* -----------------------------------------------------------------
-         * 4. Donation modal – SKIP / PROCEED
+         * 4. Donation modal – SKIP / PROCEED (Now adds directly to cart)
          * ----------------------------------------------------------------- */
         $donationModal.on('click', '.servetech-dp-skip, .servetech-dp-proceed', function (e) {
             e.preventDefault();
+            var $btn = $(this);
 
-            // store the chosen SKU (empty on SKIP)
-            if ($(this).hasClass('servetech-dp-proceed')) {
-                // user selected a tile or entered custom amount → keep chosen values
+            // Determine if user wants donation or not
+            if ($btn.hasClass('servetech-dp-proceed')) {
+                // Keep chosen values
             } else {
-                chosenSku = '';                     // SKIP
+                // SKIP - no donation
+                chosenSku = '';
                 chosenCustomAmount = 0;
                 $donationModal.find('.servetech-dp-custom-input').val('');
             }
 
-            closeModal($donationModal);
-            $('[data-product_id], form.cart').data('servetech-submitted', false);
-            openRecipientModal();                  // ALWAYS go to recipient form
+            // Add to cart directly (no recipient modal)
+            addToCartDirectly();
         });
+
         $donationModal.on('click', '.servetech-dp-close, .servetech-dp-overlay', function (e) {
             e.preventDefault();
-
-            if ($(this).hasClass('servetech-dp-proceed')) {
-            } else {
-                chosenSku = '';
-            }
-
             closeModal($donationModal);
             $('[data-product_id], form.cart').data('servetech-submitted', false);
         });
 
         /* -----------------------------------------------------------------
-         * 5. Open Recipient modal (stores everything we need)
+         * 5. Add to cart directly (without recipient modal)
          * ----------------------------------------------------------------- */
+        function addToCartDirectly() {
+            if (!window.__servetech_dp_pending) {
+                alert('No product data found');
+                return;
+            }
+
+            var payload = {
+                action: 'servetech_add_to_cart_with_donation', // Use the legacy endpoint
+                nonce: SERVETECH_DP.nonce,
+                product_id: window.__servetech_dp_pending.product_id,
+                quantity: window.__servetech_dp_pending.quantity || 1,
+                variation_id: window.__servetech_dp_pending.variation_id || 0,
+                variation: window.__servetech_dp_pending.variation || {},
+                donation_sku: chosenSku,
+                donation_custom_amount: chosenCustomAmount
+            };
+
+            // Disable proceed button
+            $donationModal.find('.servetech-dp-proceed').prop('disabled', true).text('Adding…');
+
+            $.post(SERVETECH_DP.ajax_url, payload)
+                .done(function (resp) {
+                    if (resp && resp.success) {
+                        window.location = resp.data.cart_url;
+                    } else {
+                        alert('Something went wrong. Please try again.');
+                        console.error(resp);
+                    }
+                })
+                .fail(function () {
+                    alert('Network error. Please try again.');
+                })
+                .always(function () {
+                    $donationModal.find('.servetech-dp-proceed').prop('disabled', false).text('ADD TO CART');
+                    closeModal($donationModal);
+                    $('[data-product_id], form.cart').data('servetech-submitted', false);
+                });
+        }
+
+        /* RECIPIENT MODAL FUNCTIONALITY - ALL COMMENTED OUT
+        // -----------------------------------------------------------------
+        // 5. Open Recipient modal (stores everything we need)
+        // -----------------------------------------------------------------
         function openRecipientModal() {
             pendingCartData = {
                 product_id: window.__servetech_dp_pending.product_id,
@@ -147,30 +186,27 @@
             openModal($recipientModal);
         }
 
-        /* -----------------------------------------------------------------
-         * 6. Recipient modal – CANCEL
-         * ----------------------------------------------------------------- */
+        // -----------------------------------------------------------------
+        // 6. Recipient modal – CANCEL
+        // -----------------------------------------------------------------
         $recipientModal.on('click', '.servetech-dp-cancel, .servetech-dp-close, .servetech-dp-overlay', function (e) {
             e.preventDefault();
             closeModal($recipientModal);
-            // Reset "submitted" flag so popup can reopen
             $('[data-product_id], form.cart').data('servetech-submitted', false);
 
-            // fallback: normal WooCommerce add-to-cart (no donation, no recipient)
             if (window.__servetech_dp_on_skip) {
                 window.__servetech_dp_on_skip();
             }
         });
 
-        /* -----------------------------------------------------------------
-         * 7. Recipient modal – SUBMIT (single AJAX call)
-         * ----------------------------------------------------------------- */
+        // -----------------------------------------------------------------
+        // 7. Recipient modal – SUBMIT (single AJAX call)
+        // -----------------------------------------------------------------
         $recipientModal.on('submit', '#servetech-dp-recipient-form', function (e) {
             e.preventDefault();
             var $form = $(this);
             var $submit = $form.find('.servetech-dp-submit');
 
-            // collect recipient fields
             var recipient = {
                 first_name: $form.find('[name="recip_first_name"]').val().trim(),
                 last_name: $form.find('[name="recip_last_name"]').val().trim(),
@@ -179,7 +215,6 @@
                 signed_from: $form.find('[name="signed_from"]').val().trim()
             };
 
-            // final payload – ONE AJAX request
             var payload = {
                 action: 'servetech_add_to_cart_with_recipient',
                 nonce: SERVETECH_DP.nonce,
@@ -210,12 +245,12 @@
                     $submit.prop('disabled', false).text('Add to Cart');
                 });
         });
+        END OF RECIPIENT MODAL COMMENTED CODE */
 
         /* -----------------------------------------------------------------
          * 8. Helper: build cart data from the original form (single product)
          * ----------------------------------------------------------------- */
         function buildCartData($form) {
-            // Look for input first, fallback to button
             var $productEl = $form.find('input[name="add-to-cart"]');
             if (!$productEl.length) {
                 $productEl = $form.find('button[name="add-to-cart"]');
@@ -226,7 +261,6 @@
 
             var data = { product_id, quantity };
 
-            // Check for variation
             var variation_id = $form.find('input[name="variation_id"]').val();
             if (variation_id && variation_id !== '') {
                 data.variation_id = variation_id;
@@ -240,19 +274,16 @@
             return data;
         }
 
-
         /* -----------------------------------------------------------------
-         * 9. Intercept any “Add to Cart” click / form submit
+         * 9. Intercept any "Add to Cart" click / form submit
          * ----------------------------------------------------------------- */
         function interceptEvent(e, $el, cartData) {
             e.preventDefault();
             if ($el.data('servetech-submitted')) return;
             $el.data('servetech-submitted', true);
 
-            // store globally for the modals
             window.__servetech_dp_pending = cartData;
             window.__servetech_dp_on_skip = function () {
-                // user cancelled everything → fallback to normal WooCommerce flow
                 if ($el.is('form')) { $el.off('submit').submit(); return; }
                 if ($el.is('a') && $el.attr('href')) { window.location = $el.attr('href'); return; }
                 $.post(SERVETECH_DP.ajax_url, {
@@ -262,7 +293,7 @@
                 }).always(function () { window.location = SERVETECH_DP.cart_url; });
             };
 
-            openModal($donationModal);   // start the flow
+            openModal($donationModal);
         }
 
         // ----- Archive / Loop buttons -----

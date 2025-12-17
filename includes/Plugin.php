@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: ServeTech Donation Popup
- * Description: Donation + Recipient form on Add to Cart. One AJAX. Saves recipient data to order.
- * Version: 1.0.0
+ * Description: Donation popup on Add to Cart. Recipient functionality commented out.
+ * Version: 1.0.1
  * Author: ServeTech
  * Text Domain: servetech-dp
  */
@@ -22,7 +22,7 @@ if ( ! defined( 'SERVETECH_DP_URL' ) ) {
     define( 'SERVETECH_DP_URL', plugin_dir_url( __FILE__ ) );
 }
 if ( ! defined( 'SERVETECH_DP_VERSION' ) ) {
-    define( 'SERVETECH_DP_VERSION', '1.0.0' );
+    define( 'SERVETECH_DP_VERSION', '1.0.1' );
 }
 
 class Plugin {
@@ -42,11 +42,12 @@ class Plugin {
         add_action( 'init', [ $this, 'ensure_donation_products_exist' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
-        // AJAX: Old flow (kept for fallback)
+        // AJAX: Main flow with donation (now used for direct add to cart)
         add_action( 'wp_ajax_servetech_add_to_cart_with_donation', [ $this, 'ajax_add_to_cart_with_donation' ] );
         add_action( 'wp_ajax_nopriv_servetech_add_to_cart_with_donation', [ $this, 'ajax_add_to_cart_with_donation' ] );
 
-        // AJAX: New flow – main + donation + recipient
+        /* RECIPIENT FUNCTIONALITY - COMMENTED OUT
+        // AJAX: Flow with recipient details
         add_action( 'wp_ajax_servetech_add_to_cart_with_recipient', [ $this, 'ajax_add_to_cart_with_recipient' ] );
         add_action( 'wp_ajax_nopriv_servetech_add_to_cart_with_recipient', [ $this, 'ajax_add_to_cart_with_recipient' ] );
 
@@ -56,6 +57,7 @@ class Plugin {
         // Admin: Recipient column
         add_action( 'woocommerce_admin_order_item_headers', [ $this, 'add_recipient_column_header' ] );
         add_action( 'woocommerce_admin_order_item_values', [ $this, 'add_recipient_column_value' ], 10, 3 );
+        */
     }
 
     public function on_activate() {
@@ -116,9 +118,6 @@ class Plugin {
             return 0;
         }
 
-        // Reuse a single universal custom-donation product instead of creating
-        // a new post for every custom amount. We update the product price
-        // before adding to cart.
         $sku = 'servetech-don-custom';
 
         $existing_id = wc_get_product_id_by_sku( $sku );
@@ -143,7 +142,6 @@ class Plugin {
             }
         }
 
-        // Create the universal custom product the first time it's needed.
         $product = new \WC_Product_Simple();
         $product->set_name( "Donation - \${$amount} (Custom)" );
         $product->set_status( 'publish' );
@@ -207,7 +205,7 @@ class Plugin {
     }
 
     /**
-     * Legacy AJAX (kept for fallback)
+     * AJAX: Add to cart with optional donation (supports custom amounts)
      */
     public function ajax_add_to_cart_with_donation() {
         check_ajax_referer( 'servetech_dp_nonce', 'nonce' );
@@ -223,13 +221,26 @@ class Plugin {
                             ? array_map( 'sanitize_text_field', $_POST['variation'] )
                             : [];
 
+        // Add main product to cart
         $cart_item_key = WC()->cart->add_to_cart( $product_id, $quantity, $variation_id, $variation );
         if ( ! $cart_item_key ) {
             wp_send_json_error( [ 'message' => 'Could not add main product' ], 500 );
         }
 
+        // Handle donation - support both preset SKUs and custom amounts
         $donation_sku = isset( $_POST['donation_sku'] ) ? sanitize_text_field( $_POST['donation_sku'] ) : '';
-        if ( $donation_sku ) {
+        $custom_amount = isset( $_POST['donation_custom_amount'] )
+            ? floatval( sanitize_text_field( wp_unslash( $_POST['donation_custom_amount'] ) ) )
+            : 0;
+
+        if ( $custom_amount > 0 ) {
+            // Custom donation amount
+            $donation_id = $this->create_custom_donation_product( $custom_amount );
+            if ( $donation_id ) {
+                WC()->cart->add_to_cart( $donation_id, 1 );
+            }
+        } elseif ( $donation_sku ) {
+            // Preset donation SKU
             $donation_id = wc_get_product_id_by_sku( $donation_sku );
             if ( $donation_id ) {
                 WC()->cart->add_to_cart( $donation_id, 1 );
@@ -239,9 +250,12 @@ class Plugin {
         wp_send_json_success( [ 'cart_url' => wc_get_cart_url() ] );
     }
 
-    /**
-     * NEW AJAX: Main product + donation + recipient in ONE call
-     */
+    /* =========================================================================
+     * RECIPIENT FUNCTIONALITY - ALL COMMENTED OUT
+     * ========================================================================= */
+
+    /*
+    // AJAX: Add to cart with recipient details
     public function ajax_add_to_cart_with_recipient() {
         check_ajax_referer( 'servetech_dp_nonce', 'nonce' );
 
@@ -260,7 +274,6 @@ class Plugin {
                             ? array_map( 'sanitize_text_field', $_POST['recipient'] )
                             : [];
 
-        // Build custom cart item data (this is the ONLY way to add meta)
         $cart_item_data = [];
 
         if ( ! empty( $recipient ) ) {
@@ -271,27 +284,21 @@ class Plugin {
                 '_servetech_card_message'         => $recipient['card_message'] ?? '',
                 '_servetech_signed_from'          => $recipient['signed_from']  ?? '',
             ];
-            // Filter out empty values
             $cart_item_data = array_filter( $cart_item_data );
         }
 
-        // 1. Add main product WITH recipient meta
         $main_key = WC()->cart->add_to_cart(
             $product_id,
             $quantity,
             $variation_id,
             $variation,
-            $cart_item_data  // This is where meta is attached!
+            $cart_item_data
         );
 
         if ( ! $main_key ) {
             wp_send_json_error( [ 'message' => 'Failed to add main product' ], 500 );
         }
 
-        // 2. Add donation (optional)
-        // Support custom amount: if `donation_custom_amount` is provided and > 0,
-        // create a one-off donation product and add it to the cart instead of
-        // the predefined SKU.
         $custom_amount = isset( $_POST['donation_custom_amount'] )
             ? floatval( sanitize_text_field( wp_unslash( $_POST['donation_custom_amount'] ) ) )
             : 0;
@@ -311,10 +318,7 @@ class Plugin {
         wp_send_json_success( [ 'cart_url' => wc_get_cart_url() ] );
     }
 
-    /**
-     * Save recipient meta to order item
-     */
-
+    // Save recipient meta to order item
     public function save_recipient_to_order_item( $item, $cart_item_key, $values, $order ) {
         $map = [
             '_servetech_recipient_first_name' => 'Recipient First Name',
@@ -331,16 +335,12 @@ class Plugin {
         }
     }
 
-    /**
-     * Admin: Add Recipient column header
-     */
+    // Admin: Add Recipient column header
     public function add_recipient_column_header() {
         echo '<th class="servetech-recipient sortable" data-sort="string-ins">Recipient</th>';
     }
 
-    /**
-     * Admin: Show recipient info in order items
-     */
+    // Admin: Show recipient info in order items
     public function add_recipient_column_value( $item ) {
         $first = $item->get_meta( '_servetech_recipient_first_name' );
         $last  = $item->get_meta( '_servetech_recipient_last_name' );
@@ -360,5 +360,7 @@ class Plugin {
             echo '<td class="servetech-recipient">—</td>';
         }
     }
-}
+    */
 
+    /* END OF COMMENTED RECIPIENT FUNCTIONALITY */
+}
